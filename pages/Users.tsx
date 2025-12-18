@@ -7,13 +7,12 @@ interface UsersPageProps {
   currentUser: User | null;
   onAddUser: (user: Omit<User, 'id'>) => void;
   onDeleteUser: (id: string) => void;
-  onUpdateUser: (user: User) => void; // New Prop
+  onUpdateUser: (user: User) => void;
 }
 
 const UsersPage: React.FC<UsersPageProps> = ({ users, currentUser, onAddUser, onDeleteUser, onUpdateUser }) => {
   const [showModal, setShowModal] = useState(false);
   
-  // Profile Edit State
   const [profileData, setProfileData] = useState<User>(currentUser || {
       id: '', name: '', username: '', password: '', role: UserRole.STAFF
   });
@@ -40,14 +39,16 @@ const UsersPage: React.FC<UsersPageProps> = ({ users, currentUser, onAddUser, on
 
   const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
       if (e.target.files && e.target.files[0]) {
-          const url = URL.createObjectURL(e.target.files[0]);
-          setProfileData({ ...profileData, photo: url });
+          const reader = new FileReader();
+          reader.onloadend = () => {
+              setProfileData({ ...profileData, photo: reader.result as string });
+          };
+          reader.readAsDataURL(e.target.files[0]);
       }
   };
 
   return (
     <div className="space-y-8 animate-fade-in">
-      {/* My Profile Section */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
           <div className="p-6 border-b border-gray-100 bg-gray-50">
               <h2 className="text-xl font-bold text-gray-800">My Profile</h2>
@@ -106,7 +107,6 @@ const UsersPage: React.FC<UsersPageProps> = ({ users, currentUser, onAddUser, on
           </div>
       </div>
 
-      {/* User Management Section */}
       <div className="space-y-6">
         <div className="flex justify-between items-center">
             <div>
@@ -155,7 +155,6 @@ const UsersPage: React.FC<UsersPageProps> = ({ users, currentUser, onAddUser, on
         </div>
       </div>
 
-      {/* Add User Modal */}
       {showModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-6">

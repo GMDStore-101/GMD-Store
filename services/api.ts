@@ -10,16 +10,27 @@ const STORAGE_KEYS = {
 };
 
 const loadData = (key: string, defaults: any) => {
-  const saved = localStorage.getItem(key);
-  return saved ? JSON.parse(saved) : defaults;
+  try {
+    const saved = localStorage.getItem(key);
+    return saved ? JSON.parse(saved) : defaults;
+  } catch (e) {
+    console.error(`Error loading ${key} from localStorage:`, e);
+    return defaults;
+  }
 };
 
 const saveData = (key: string, data: any) => {
-  localStorage.setItem(key, JSON.stringify(data));
+  try {
+    localStorage.setItem(key, JSON.stringify(data));
+  } catch (e) {
+    console.error(`CRITICAL: Failed to save ${key} to localStorage (Storage full?):`, e);
+    // Do not throw here to prevent React from crashing the whole app
+  }
 };
 
 const DEFAULT_SETTINGS: AppSettings = {
   storeName: 'GMD Shuttering Store',
+  tagline: 'Shuttering & Scaffold',
   storeAddress: 'Main Market, Industrial Area',
   storePhone: '0300-1234567',
   ownerName: 'Owner Name',

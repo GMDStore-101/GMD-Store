@@ -60,7 +60,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isMobileOpen
             )}
             <div>
               <h1 className="text-lg font-bold leading-tight">{settings.storeName}</h1>
-              <p className="text-[10px] opacity-70">Shuttering & Scaffold</p>
+              <p className="text-[10px] opacity-70">{settings.tagline}</p>
             </div>
           </div>
           <button 

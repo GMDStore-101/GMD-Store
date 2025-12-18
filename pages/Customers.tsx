@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
 import { Customer, CustomerTier } from '../types';
-import { Phone, MapPin, Award, Search, Edit, Trash2, X, Plus, UserCheck, CreditCard, Eye, FileText, Printer, Wallet } from 'lucide-react';
+import { Phone, MapPin, Award, Search, Edit, Trash2, X, Plus, UserCheck, CreditCard, Eye, FileText, Printer, Wallet, Download } from 'lucide-react';
 import { formatCNIC, formatPhoneNumber } from '../utils/format';
+import html2canvas from 'html2canvas';
+import jsPDF from 'jspdf';
 
 interface CustomersProps {
   customers: Customer[];
@@ -16,6 +18,7 @@ const Customers: React.FC<CustomersProps> = ({ customers, onAddCustomer, onUpdat
   // Modal States
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
+  const [isDownloading, setIsDownloading] = useState(false);
   const [viewCustomer, setViewCustomer] = useState<Customer | null>(null);
 
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
@@ -67,10 +70,41 @@ const Customers: React.FC<CustomersProps> = ({ customers, onAddCustomer, onUpdat
       setIsViewModalOpen(true);
   };
 
+  const handleDownloadPDF = async () => {
+      const element = document.getElementById('customer-profile-content');
+      if(!element || !viewCustomer) return;
+      
+      setIsDownloading(true);
+      try {
+        const canvas = await html2canvas(element, {
+            scale: 2, 
+            useCORS: true,
+            logging: false,
+            backgroundColor: '#ffffff'
+        });
+        
+        const imgData = canvas.toDataURL('image/png');
+        const pdf = new jsPDF('p', 'mm', 'a4');
+        const pdfWidth = pdf.internal.pageSize.getWidth();
+        const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
+        
+        pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
+        pdf.save(`${viewCustomer.name}_Profile.pdf`);
+      } catch (err) {
+          console.error(err);
+          alert('Failed to generate PDF');
+      } finally {
+          setIsDownloading(false);
+      }
+  };
+
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>, field: 'photo' | 'cnicFront' | 'cnicBack') => {
     if (e.target.files && e.target.files[0]) {
-      const url = URL.createObjectURL(e.target.files[0]);
-      setFormData(prev => ({ ...prev, [field]: url }));
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setFormData(prev => ({ ...prev, [field]: reader.result as string }));
+      };
+      reader.readAsDataURL(e.target.files[0]);
     }
   };
 
@@ -336,7 +370,7 @@ const Customers: React.FC<CustomersProps> = ({ customers, onAddCustomer, onUpdat
         </div>
       )}
 
-      {/* VIEW FULL DETAILS MODAL (PRINTABLE) */}
+      {/* VIEW FULL DETAILS MODAL (DOWNLOADABLE PDF) */}
       {isViewModalOpen && viewCustomer && (
            <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50 p-4">
               <div className="bg-white w-full max-w-3xl shadow-2xl overflow-hidden rounded-xl animate-fade-in flex flex-col max-h-[90vh]">
@@ -345,12 +379,19 @@ const Customers: React.FC<CustomersProps> = ({ customers, onAddCustomer, onUpdat
                             <FileText size={20} className="text-blue-600"/> Customer File: {viewCustomer.name}
                         </h3>
                         <div className="flex gap-2">
-                            <button onClick={() => window.print()} className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded text-sm hover:bg-blue-700"><Printer size={16}/> Print File</button>
+                            <button 
+                                onClick={handleDownloadPDF} 
+                                disabled={isDownloading}
+                                className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded text-sm hover:bg-blue-700 disabled:opacity-50"
+                            >
+                                {isDownloading ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div> : <Download size={16}/>}
+                                Download PDF
+                            </button>
                             <button onClick={() => setIsViewModalOpen(false)} className="text-gray-400 hover:text-gray-600"><X size={20}/></button>
                         </div>
                   </div>
                   
-                  <div className="p-8 overflow-y-auto print-modal">
+                  <div id="customer-profile-content" className="p-8 overflow-y-auto bg-white">
                       <div className="text-center mb-8 pb-6 border-b-2 border-gray-200">
                            <h1 className="text-3xl font-bold uppercase text-gray-800">Customer Profile</h1>
                            <p className="text-gray-500">Registered Client Record</p>
@@ -402,7 +443,7 @@ const Customers: React.FC<CustomersProps> = ({ customers, onAddCustomer, onUpdat
                           </div>
                       </div>
 
-                      <div className="mb-8 page-break-inside-avoid">
+                      <div className="mb-8">
                           <h4 className="text-lg font-bold text-gray-800 border-b border-gray-200 pb-2 mb-4">Identification Documents</h4>
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                               <div>

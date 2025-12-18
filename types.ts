@@ -103,6 +103,7 @@ export interface Rental {
 
 export interface AppSettings {
   storeName: string;
+  tagline: string;
   storeAddress: string;
   storePhone: string;
   ownerName: string;

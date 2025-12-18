@@ -56,7 +56,8 @@ const Invoices: React.FC<InvoicesProps> = ({ rentals, settings }) => {
           {/* Header */}
           <div className="text-center border-b-2 border-black pb-4 mb-6">
                <h1 className="text-3xl font-bold uppercase tracking-wide mb-1">{settings.storeName}</h1>
-               <p className="text-sm font-bold text-gray-800 uppercase mb-1">Prop: {settings.ownerName}</p>
+               <p className="text-xs uppercase tracking-widest text-gray-500 mb-2">{settings.tagline}</p>
+               <p className="text-sm font-bold text-gray-800 uppercase mb-1">Owner: {settings.ownerName}</p>
                <p className="text-gray-600">{settings.storeAddress}</p>
                <p className="text-gray-600 font-bold">{settings.storePhone}</p>
           </div>

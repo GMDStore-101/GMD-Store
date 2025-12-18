@@ -57,8 +57,11 @@ const Inventory: React.FC<InventoryProps> = ({ products, onAddProduct, onUpdateP
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
-      const url = URL.createObjectURL(e.target.files[0]);
-      setFormData({ ...formData, image: url });
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setFormData(prev => ({ ...prev, image: reader.result as string }));
+      };
+      reader.readAsDataURL(e.target.files[0]);
     }
   };
 
@@ -203,7 +206,6 @@ const Inventory: React.FC<InventoryProps> = ({ products, onAddProduct, onUpdateP
                     <button onClick={() => setIsModalOpen(false)} className="text-gray-400 hover:text-gray-600"><X size={20}/></button>
                 </div>
                 <form onSubmit={handleSubmit} className="p-6 space-y-4 max-h-[80vh] overflow-y-auto">
-                    {/* Form content remains same */}
                     <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">Product Name</label>
                         <input 

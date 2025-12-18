@@ -31,29 +31,17 @@ const App: React.FC = () => {
   
   const [openNewRentalModal, setOpenNewRentalModal] = useState(false);
 
-  // Data State
-  const [users, setUsers] = useState<User[]>([]);
-  const [products, setProducts] = useState<Product[]>([]);
-  const [customers, setCustomers] = useState<Customer[]>([]);
-  const [rentals, setRentals] = useState<Rental[]>([]);
-  const [settings, setSettings] = useState<AppSettings>(api.getSettings());
-
-  // Initial Load
-  useEffect(() => {
-    const loadedUsers = api.getUsers();
-    if(loadedUsers.length === 0) {
-        api.saveUsers([DEFAULT_ADMIN]);
-        setUsers([DEFAULT_ADMIN]);
-    } else {
-        setUsers(loadedUsers);
-    }
-    setProducts(api.getProducts());
-    setCustomers(api.getCustomers());
-    setRentals(api.getRentals());
-  }, []);
+  // Initialize data states directly from storage to prevent race conditions
+  const [users, setUsers] = useState<User[]>(() => {
+    const loaded = api.getUsers();
+    return loaded.length > 0 ? loaded : [DEFAULT_ADMIN];
+  });
+  const [products, setProducts] = useState<Product[]>(() => api.getProducts());
+  const [customers, setCustomers] = useState<Customer[]>(() => api.getCustomers());
+  const [rentals, setRentals] = useState<Rental[]>(() => api.getRentals());
+  const [settings, setSettings] = useState<AppSettings>(() => api.getSettings());
 
   // --- PERSISTENCE ---
-  // Rely exclusively on these effects for saving to avoid race conditions in delete handlers
   useEffect(() => api.saveUsers(users), [users]);
   useEffect(() => api.saveProducts(products), [products]);
   useEffect(() => api.saveCustomers(customers), [customers]);
@@ -90,21 +78,18 @@ const App: React.FC = () => {
       }
   };
 
-  // Inventory - FIXED DELETION: Only update state, let useEffect handle save
   const handleAddProduct = (prod: Product) => setProducts(prev => [...prev, prod]);
   const handleUpdateProduct = (prod: Product) => setProducts(prev => prev.map(p => p.id === prod.id ? prod : p));
   const handleDeleteProduct = (id: string) => {
       setProducts(prev => prev.filter(p => p.id !== id));
   };
 
-  // Customers - FIXED DELETION: Only update state
   const handleAddCustomer = (cust: Customer) => setCustomers(prev => [...prev, cust]);
   const handleUpdateCustomer = (cust: Customer) => setCustomers(prev => prev.map(c => c.id === cust.id ? cust : c));
   const handleDeleteCustomer = (id: string) => {
       setCustomers(prev => prev.filter(c => c.id !== id));
   };
 
-  // Credit / Udhaar Settlement
   const handleSettleDebt = (customerId: string, amount: number) => {
       setCustomers(prev => prev.map(c => {
           if (c.id === customerId) {
@@ -114,9 +99,7 @@ const App: React.FC = () => {
       }));
   };
 
-  // Rentals
   const handleAddRental = (rent: Rental) => {
-    // 1. Update Inventory Stock
     const updatedProducts = products.map(p => {
         const item = rent.items.find(i => i.productId === p.id);
         if(item) {
@@ -126,18 +109,12 @@ const App: React.FC = () => {
     });
     setProducts(updatedProducts);
 
-    // 2. Check if Customer has an ACTIVE rental profile
     const existingRentalIndex = rentals.findIndex(r => r.customerId === rent.customerId && r.status === RentalStatus.ACTIVE);
 
     if (existingRentalIndex > -1) {
-        // MERGE INTO EXISTING
         const updatedRentals = [...rentals];
         const existingRental = updatedRentals[existingRentalIndex];
-        
-        // Update Advance Payment (Accumulate)
         const newAdvance = (existingRental.advancePayment || 0) + (rent.advancePayment || 0);
-        
-        // Merge Items
         const newItemsList = [...existingRental.items];
         rent.items.forEach(newItem => {
             const existingItemIndex = newItemsList.findIndex(i => i.productId === newItem.productId);
@@ -155,10 +132,8 @@ const App: React.FC = () => {
         };
         setRentals(updatedRentals);
     } else {
-        // CREATE NEW
         setRentals([rent, ...rentals]);
     }
-    
     setOpenNewRentalModal(false); 
   };
 
@@ -170,7 +145,6 @@ const App: React.FC = () => {
     setRentals(prev => prev.map(r => r.id === id ? { ...r, status } : r));
   };
 
-  // Return Items - Generates Invoice
   const handleReturnItems = (
       rentalId: string, 
       returnedItems: { productId: string; qty: number }[], 
@@ -178,19 +152,17 @@ const App: React.FC = () => {
       returnDate: string, 
       discount: number = 0,
       receivedAmount: number = 0,
-      previousDebt: number = 0 // New Parameter
+      previousDebt: number = 0
     ): Invoice | null => {
     
     const rental = rentals.find(r => r.id === rentalId);
     if(!rental) return null;
 
-    // FIND CUSTOMER FIRST to ensure we have the name for the invoice
     const customer = customers.find(c => c.id === rental.customerId);
     const customerName = customer ? customer.name : 'Unknown';
     const customerPhone = customer ? customer.phone : '';
     const customerAddress = customer ? customer.address : '';
 
-    // 1. Calculate Invoice Amount (Original Start Date to Return Date)
     const start = new Date(rental.startDate);
     const end = new Date(returnDate);
     const diffTime = Math.abs(end.getTime() - start.getTime());
@@ -199,7 +171,6 @@ const App: React.FC = () => {
     let subTotal = 0;
     const invoiceItems: any[] = [];
 
-    // 2. Update Rental Items (Reduce Quantity)
     const updatedItems = rental.items.map(item => {
         const returned = returnedItems.find(r => r.productId === item.productId);
         if (returned) {
@@ -216,10 +187,8 @@ const App: React.FC = () => {
         return item;
     }).filter(item => item.quantity > 0); 
 
-    // 3. Determine New Status
     const newStatus = updatedItems.length === 0 ? RentalStatus.COMPLETED : RentalStatus.ACTIVE;
 
-    // 4. Update Product Stock
     const updatedProducts = products.map(p => {
         const returned = returnedItems.find(r => r.productId === p.id);
         if(returned) {
@@ -229,11 +198,9 @@ const App: React.FC = () => {
     });
     setProducts(updatedProducts);
 
-    // 5. Financial Calculations
     const totalAdvanceAvailable = rental.advancePayment || 0;
     const netBillAfterDiscount = Math.max(0, subTotal - discount);
     
-    // Auto-adjust Advance first
     let advanceAdjusted = 0;
     let remainingAdvance = totalAdvanceAvailable;
 
@@ -247,22 +214,16 @@ const App: React.FC = () => {
         }
     }
     
-    // Logic:
-    // Current Payable = Bill - Advance
-    // Total Outstanding = Current Payable + Previous Debt
-    // New Balance Due = Total Outstanding - Received Amount
-    
     const currentPayable = netBillAfterDiscount - advanceAdjusted;
     const totalOutstanding = currentPayable + previousDebt;
     const balanceDue = Math.max(0, totalOutstanding - receivedAmount);
 
-    // 6. Update Customer stats & Debt
     const updatedCustomers = customers.map(c => {
         if(c.id === rental.customerId) {
             const updatedC = { 
                 ...c, 
                 totalSpent: c.totalSpent + subTotal,
-                totalDebt: balanceDue // Set to the new calculated balance
+                totalDebt: balanceDue
             }; 
             return api.recalculateCustomerTier(updatedC);
         }
@@ -270,7 +231,6 @@ const App: React.FC = () => {
     });
     setCustomers(updatedCustomers);
 
-    // 7. Generate Invoice
     const totalInvoices = rentals.reduce((count, r) => count + (r.invoices ? r.invoices.length : 0), 0);
     const nextInvoiceId = (totalInvoices + 1).toString().padStart(2, '0');
 
@@ -281,13 +241,11 @@ const App: React.FC = () => {
         items: invoiceItems,
         subTotal: subTotal,
         discount: discount,
-        totalAmount: netBillAfterDiscount, // Current Bill
+        totalAmount: netBillAfterDiscount,
         advanceAdjusted: advanceAdjusted,
-        
-        previousDebt: previousDebt, // Recorded history
+        previousDebt: previousDebt,
         receivedAmount: receivedAmount,
         balanceDue: balanceDue,
-        
         isPaid: balanceDue === 0,
         createdBy: createdBy,
         customerName: customerName,
@@ -299,7 +257,7 @@ const App: React.FC = () => {
         ...rental,
         items: updatedItems,
         status: newStatus,
-        startDate: rental.startDate, // No Reset
+        startDate: rental.startDate,
         advancePayment: remainingAdvance, 
         totalAmount: rental.totalAmount + subTotal,
         invoices: [...(rental.invoices || []), newInvoice]
@@ -315,8 +273,6 @@ const App: React.FC = () => {
       setOpenNewRentalModal(true);
   };
 
-  // --- RENDERING ---
-
   if (!currentUser) {
     return <Login onLogin={handleLogin} />;
   }
@@ -328,7 +284,7 @@ const App: React.FC = () => {
             rentals={rentals} 
             products={products} 
             customersCount={customers.length} 
-            customers={customers} // Pass customers for debt calc
+            customers={customers}
             onNavigate={setActiveTab}
             onCreateOrder={handleCreateOrder}
         />;
