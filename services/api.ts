@@ -1,56 +1,78 @@
 import { Customer, Product, Rental, User, CustomerTier, AppSettings } from "../types";
-import { MOCK_CUSTOMERS, MOCK_PRODUCTS, MOCK_RENTALS } from "../constants";
+
+/**
+ * API Service
+ * Handles both local persistence and server-side sync (if available).
+ */
+
+const API_URL = 'api.php';
+
+// Internal helper for localStorage keys
+const getLocalKey = (type: string) => 'gmd_backup_' + type;
+
+const fetchFromHost = async (type: string) => {
+    try {
+        const url = `${API_URL}?action=get&type=${type}`;
+        const response = await fetch(url);
+        
+        if (!response.ok) {
+            throw new Error(`Server returned ${response.status}`);
+        }
+        
+        const data = await response.json();
+        localStorage.setItem(getLocalKey(type), JSON.stringify(data));
+        return data;
+    } catch (e) {
+        // This is critical for Netlify: it falls back to LocalStorage if api.php isn't there
+        console.warn(`Sync unavailable for ${type}. Using local storage.`);
+        const saved = localStorage.getItem(getLocalKey(type));
+        return saved ? JSON.parse(saved) : [];
+    }
+};
+
+const saveToHost = async (type: string, data: any) => {
+    // Always save locally first for speed and offline support
+    localStorage.setItem(getLocalKey(type), JSON.stringify(data));
+    
+    try {
+        const url = `${API_URL}?action=save&type=${type}`;
+        const response = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+        });
+        
+        if (!response.ok) {
+            console.debug('Host update skipped (No backend detected).');
+        }
+    } catch (e) {
+        // Silently fail as the data is already in LocalStorage
+    }
+};
 
 const STORAGE_KEYS = {
-  USERS: 'gmd_users',
-  PRODUCTS: 'gmd_products',
-  CUSTOMERS: 'gmd_customers',
-  RENTALS: 'gmd_rentals',
   SETTINGS: 'gmd_settings'
-};
-
-const loadData = (key: string, defaults: any) => {
-  try {
-    const saved = localStorage.getItem(key);
-    return saved ? JSON.parse(saved) : defaults;
-  } catch (e) {
-    console.error(`Error loading ${key} from localStorage:`, e);
-    return defaults;
-  }
-};
-
-const saveData = (key: string, data: any) => {
-  try {
-    localStorage.setItem(key, JSON.stringify(data));
-  } catch (e) {
-    console.error(`CRITICAL: Failed to save ${key} to localStorage (Storage full?):`, e);
-    // Do not throw here to prevent React from crashing the whole app
-  }
 };
 
 const DEFAULT_SETTINGS: AppSettings = {
   storeName: 'GMD Shuttering Store',
   tagline: 'Shuttering & Scaffold',
-  storeAddress: 'Main Market, Industrial Area',
-  storePhone: '0300-1234567',
-  ownerName: 'Owner Name',
+  storeAddress: 'Main Market, Haveli Lakha',
+  storePhone: '0302-4983711',
+  ownerName: 'Ghulam Mustafa Doula',
   theme: 'slate'
 };
 
 export const api = {
-  // Users
-  getUsers: (): User[] => loadData(STORAGE_KEYS.USERS, []),
-  saveUsers: (users: User[]) => saveData(STORAGE_KEYS.USERS, users),
+  getUsers: async (): Promise<User[]> => fetchFromHost('users'),
+  saveUsers: async (users: User[]) => saveToHost('users', users),
 
-  // Products
-  getProducts: (): Product[] => loadData(STORAGE_KEYS.PRODUCTS, MOCK_PRODUCTS),
-  saveProducts: (products: Product[]) => saveData(STORAGE_KEYS.PRODUCTS, products),
+  getProducts: async (): Promise<Product[]> => fetchFromHost('products'),
+  saveProducts: async (products: Product[]) => saveToHost('products', products),
 
-  // Customers
-  getCustomers: (): Customer[] => loadData(STORAGE_KEYS.CUSTOMERS, MOCK_CUSTOMERS),
-  saveCustomers: (customers: Customer[]) => saveData(STORAGE_KEYS.CUSTOMERS, customers),
+  getCustomers: async (): Promise<Customer[]> => fetchFromHost('customers'),
+  saveCustomers: async (customers: Customer[]) => saveToHost('customers', customers),
   
-  // Update Customer Tier Logic
   recalculateCustomerTier: (customer: Customer): Customer => {
     if (customer.totalSpent > 500000) customer.tier = CustomerTier.PLATINUM;
     else if (customer.totalSpent > 200000) customer.tier = CustomerTier.GOLD;
@@ -60,11 +82,15 @@ export const api = {
     return customer;
   },
 
-  // Rentals
-  getRentals: (): Rental[] => loadData(STORAGE_KEYS.RENTALS, MOCK_RENTALS),
-  saveRentals: (rentals: Rental[]) => saveData(STORAGE_KEYS.RENTALS, rentals),
+  getRentals: async (): Promise<Rental[]> => fetchFromHost('rentals'),
+  saveRentals: async (rentals: Rental[]) => saveToHost('rentals', rentals),
 
-  // Settings
-  getSettings: (): AppSettings => loadData(STORAGE_KEYS.SETTINGS, DEFAULT_SETTINGS),
-  saveSettings: (settings: AppSettings) => saveData(STORAGE_KEYS.SETTINGS, settings),
+  getSettings: (): AppSettings => {
+    const saved = localStorage.getItem(STORAGE_KEYS.SETTINGS);
+    return saved ? JSON.parse(saved) : DEFAULT_SETTINGS;
+  },
+  saveSettings: (settings: AppSettings) => {
+    localStorage.setItem(STORAGE_KEYS.SETTINGS, JSON.stringify(settings));
+    saveToHost('settings', settings); 
+  },
 };

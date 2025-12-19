@@ -1,5 +1,6 @@
+
 import React from 'react';
-import { LayoutDashboard, Package, Users, Receipt, FileText, X, TrendingUp, Shield, LogOut, Settings as SettingsIcon, BookOpen } from 'lucide-react';
+import { LayoutDashboard, Package, Users, Receipt, FileText, X, TrendingUp, Shield, LogOut, Settings as SettingsIcon, BookOpen, Server } from 'lucide-react';
 import { User, AppSettings } from '../types';
 
 interface SidebarProps {
@@ -60,7 +61,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isMobileOpen
             )}
             <div>
               <h1 className="text-lg font-bold leading-tight">{settings.storeName}</h1>
-              <p className="text-[10px] opacity-70">{settings.tagline}</p>
+              <p className="text-[10px] opacity-70 uppercase tracking-widest">{settings.tagline}</p>
             </div>
           </div>
           <button 
@@ -89,6 +90,12 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isMobileOpen
             </button>
           ))}
         </nav>
+
+        {/* Server Status */}
+        <div className="px-6 py-2 text-[10px] text-slate-500 flex items-center gap-2">
+            <div className="w-2 h-2 rounded-full bg-emerald-500"></div>
+            <span>CPANEL SERVER ACTIVE</span>
+        </div>
 
         {/* User Profile / Footer */}
         <div className="p-4 bg-black/20 border-t border-white/10">

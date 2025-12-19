@@ -1,20 +1,19 @@
 import React, { useState, useEffect } from 'react';
-import Sidebar from './components/Sidebar';
-import Dashboard from './pages/Dashboard';
-import Inventory from './pages/Inventory';
-import Rentals from './pages/Rentals';
-import Customers from './pages/Customers';
-import Revenue from './pages/Revenue';
-import Login from './pages/Login';
-import UsersPage from './pages/Users';
-import Settings from './pages/Settings';
-import Invoices from './pages/Invoices'; 
-import Credit from './pages/Credit';
-import { api } from './services/api';
-import { Menu } from 'lucide-react';
-import { User, UserRole, Product, Customer, Rental, RentalStatus, Invoice, AppSettings } from './types';
+import Sidebar from './components/Sidebar.tsx';
+import Dashboard from './pages/Dashboard.tsx';
+import Inventory from './pages/Inventory.tsx';
+import Rentals from './pages/Rentals.tsx';
+import Customers from './pages/Customers.tsx';
+import Revenue from './pages/Revenue.tsx';
+import Login from './pages/Login.tsx';
+import UsersPage from './pages/Users.tsx';
+import Settings from './pages/Settings.tsx';
+import Invoices from './pages/Invoices.tsx'; 
+import Credit from './pages/Credit.tsx';
+import { api } from './services/api.ts';
+import { Menu, Loader2 } from 'lucide-react';
+import { User, UserRole, Product, Customer, Rental, RentalStatus, Invoice, AppSettings } from './types.ts';
 
-// Default Admin User (For first run)
 const DEFAULT_ADMIN: User = {
   id: 'u1',
   username: 'sajjad900',
@@ -24,31 +23,48 @@ const DEFAULT_ADMIN: User = {
 };
 
 const App: React.FC = () => {
-  // --- STATE ---
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [activeTab, setActiveTab] = useState('dashboard');
   const [isMobileOpen, setIsMobileOpen] = useState(false);
-  
+  const [isLoading, setIsLoading] = useState(true);
   const [openNewRentalModal, setOpenNewRentalModal] = useState(false);
 
-  // Initialize data states directly from storage to prevent race conditions
-  const [users, setUsers] = useState<User[]>(() => {
-    const loaded = api.getUsers();
-    return loaded.length > 0 ? loaded : [DEFAULT_ADMIN];
-  });
-  const [products, setProducts] = useState<Product[]>(() => api.getProducts());
-  const [customers, setCustomers] = useState<Customer[]>(() => api.getCustomers());
-  const [rentals, setRentals] = useState<Rental[]>(() => api.getRentals());
-  const [settings, setSettings] = useState<AppSettings>(() => api.getSettings());
+  const [users, setUsers] = useState<User[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [rentals, setRentals] = useState<Rental[]>([]);
+  const [settings, setSettings] = useState<AppSettings>(api.getSettings());
 
-  // --- PERSISTENCE ---
-  useEffect(() => api.saveUsers(users), [users]);
-  useEffect(() => api.saveProducts(products), [products]);
-  useEffect(() => api.saveCustomers(customers), [customers]);
-  useEffect(() => api.saveRentals(rentals), [rentals]);
-  useEffect(() => api.saveSettings(settings), [settings]);
+  useEffect(() => {
+    const initApp = async () => {
+      setIsLoading(true);
+      try {
+        const [hostUsers, hostProducts, hostCustomers, hostRentals] = await Promise.all([
+          api.getUsers(),
+          api.getProducts(),
+          api.getCustomers(),
+          api.getRentals()
+        ]);
 
-  // --- AUTH HANDLERS ---
+        setUsers(hostUsers.length > 0 ? hostUsers : [DEFAULT_ADMIN]);
+        setProducts(hostProducts);
+        setCustomers(hostCustomers);
+        setRentals(hostRentals);
+      } catch (e) {
+        console.error("Host fetch failed", e);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    initApp();
+  }, []);
+
+  useEffect(() => { if(!isLoading) api.saveUsers(users); }, [users, isLoading]);
+  useEffect(() => { if(!isLoading) api.saveProducts(products); }, [products, isLoading]);
+  useEffect(() => { if(!isLoading) api.saveCustomers(customers); }, [customers, isLoading]);
+  useEffect(() => { if(!isLoading) api.saveRentals(rentals); }, [rentals, isLoading]);
+  useEffect(() => { if(!isLoading) api.saveSettings(settings); }, [settings, isLoading]);
+
   const handleLogin = (u: string, p: string) => {
     const foundUser = users.find(user => user.username === u && user.password === p);
     if (foundUser) {
@@ -63,8 +79,6 @@ const App: React.FC = () => {
     setActiveTab('dashboard');
   };
 
-  // --- DATA HANDLERS ---
-  
   const handleAddUser = (newUser: Omit<User, 'id'>) => {
     setUsers(prev => [...prev, { ...newUser, id: `u${Date.now()}` }]);
   };
@@ -108,32 +122,7 @@ const App: React.FC = () => {
         return p;
     });
     setProducts(updatedProducts);
-
-    const existingRentalIndex = rentals.findIndex(r => r.customerId === rent.customerId && r.status === RentalStatus.ACTIVE);
-
-    if (existingRentalIndex > -1) {
-        const updatedRentals = [...rentals];
-        const existingRental = updatedRentals[existingRentalIndex];
-        const newAdvance = (existingRental.advancePayment || 0) + (rent.advancePayment || 0);
-        const newItemsList = [...existingRental.items];
-        rent.items.forEach(newItem => {
-            const existingItemIndex = newItemsList.findIndex(i => i.productId === newItem.productId);
-            if (existingItemIndex > -1) {
-                newItemsList[existingItemIndex].quantity += newItem.quantity;
-            } else {
-                newItemsList.push(newItem);
-            }
-        });
-
-        updatedRentals[existingRentalIndex] = {
-            ...existingRental,
-            advancePayment: newAdvance,
-            items: newItemsList
-        };
-        setRentals(updatedRentals);
-    } else {
-        setRentals([rent, ...rentals]);
-    }
+    setRentals([rent, ...rentals]);
     setOpenNewRentalModal(false); 
   };
 
@@ -272,6 +261,16 @@ const App: React.FC = () => {
       setActiveTab('rentals');
       setOpenNewRentalModal(true);
   };
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center text-white p-8">
+        <Loader2 className="w-12 h-12 text-orange-500 animate-spin mb-4" />
+        <h1 className="text-2xl font-bold">GMD Shuttering Store</h1>
+        <p className="text-slate-400 mt-2">Connecting to Server...</p>
+      </div>
+    );
+  }
 
   if (!currentUser) {
     return <Login onLogin={handleLogin} />;
