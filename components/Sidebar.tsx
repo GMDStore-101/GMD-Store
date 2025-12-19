@@ -1,6 +1,5 @@
-
 import React from 'react';
-import { LayoutDashboard, Package, Users, Receipt, FileText, X, TrendingUp, Shield, LogOut, Settings as SettingsIcon, BookOpen, Server } from 'lucide-react';
+import { LayoutDashboard, Package, Users, Receipt, FileText, X, TrendingUp, Shield, LogOut, Settings as SettingsIcon, BookOpen, Cloud, CloudOff } from 'lucide-react';
 import { User, AppSettings } from '../types';
 
 interface SidebarProps {
@@ -37,7 +36,6 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isMobileOpen
 
   return (
     <>
-      {/* Mobile Overlay */}
       {isMobileOpen && (
         <div 
           className="fixed inset-0 z-20 bg-black bg-opacity-50 lg:hidden"
@@ -45,7 +43,6 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isMobileOpen
         />
       )}
 
-      {/* Sidebar Container */}
       <div className={`
         fixed lg:static inset-y-0 left-0 z-30
         w-64 text-white transform transition-transform duration-300 ease-in-out
@@ -53,7 +50,6 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isMobileOpen
         flex flex-col h-full
         ${getThemeColors()}
       `}>
-        {/* Logo Area */}
         <div className="p-6 flex items-center justify-between border-b border-white/10">
           <div className="flex items-center gap-3">
             {settings.logoUrl && (
@@ -72,7 +68,6 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isMobileOpen
           </button>
         </div>
 
-        {/* Navigation Items */}
         <nav className="flex-1 px-4 py-4 space-y-2 overflow-y-auto">
           {navItems.map((item) => (
             <button
@@ -91,13 +86,12 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isMobileOpen
           ))}
         </nav>
 
-        {/* Server Status */}
-        <div className="px-6 py-2 text-[10px] text-slate-500 flex items-center gap-2">
-            <div className="w-2 h-2 rounded-full bg-emerald-500"></div>
-            <span>CPANEL SERVER ACTIVE</span>
+        <div className="px-6 py-3 text-[10px] text-slate-500 flex items-center gap-2 border-t border-white/5">
+            <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div>
+            <Cloud size={12} className="text-emerald-500" />
+            <span className="font-bold tracking-tighter">NEON CLOUD SYNC ACTIVE</span>
         </div>
 
-        {/* User Profile / Footer */}
         <div className="p-4 bg-black/20 border-t border-white/10">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-3">

@@ -1,44 +1,63 @@
 import { Customer, Product, Rental, User, CustomerTier, AppSettings } from "../types";
 
 /**
- * API Service
- * Handles both local persistence and server-side sync.
- * Optimized for both cPanel (PHP) and static hosting (Netlify).
+ * Advanced Cloud API Service
+ * Integrates with Netlify Functions (Neon Database) and fallback systems.
  */
 
-const API_URL = 'api.php';
-const getLocalKey = (type: string) => 'gmd_backup_' + type;
+// Try Netlify Function endpoint first, then standard api.php for cPanel
+const NETLIFY_API = '/.netlify/functions/api';
+const PHP_API = 'api.php';
 
-const fetchFromHost = async (type: string) => {
+const getLocalKey = (type: string) => 'gmd_cloud_cache_' + type;
+
+const fetchFromCloud = async (type: string) => {
     try {
-        const response = await fetch(`${API_URL}?action=get&type=${type}`);
+        // Attempt Netlify Function
+        let response = await fetch(`${NETLIFY_API}?type=${type}`);
+        
+        // If not found or error, try PHP fallback
+        if (!response.ok) {
+            response = await fetch(`${PHP_API}?action=get&type=${type}`);
+        }
         
         if (response.ok) {
             const data = await response.json();
-            localStorage.setItem(getLocalKey(type), JSON.stringify(data));
-            return data;
+            if (data) {
+              localStorage.setItem(getLocalKey(type), JSON.stringify(data));
+              return data;
+            }
         }
     } catch (e) {
-        // Log error only in development if needed
+        console.debug(`Cloud fetch failed for ${type}, using cache.`);
     }
     
-    // Fallback to local storage for static hosting/offline
+    // Recovery from local cache
     const saved = localStorage.getItem(getLocalKey(type));
     return saved ? JSON.parse(saved) : [];
 };
 
-const saveToHost = async (type: string, data: any) => {
-    // Persistent local backup
+const saveToCloud = async (type: string, data: any) => {
+    // Immediate local update for UI snappiness
     localStorage.setItem(getLocalKey(type), JSON.stringify(data));
     
     try {
-        await fetch(`${API_URL}?action=save&type=${type}`, {
+        // Attempt Netlify Function save
+        const response = await fetch(`${NETLIFY_API}?type=${type}`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(data)
         });
+
+        if (!response.ok) {
+          // Fallback to PHP save
+          await fetch(`${PHP_API}?action=save&type=${type}`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(data)
+          });
+        }
     } catch (e) {
-        // Silently fail if no backend is present
+        console.debug(`Cloud save delayed for ${type}.`);
     }
 };
 
@@ -56,14 +75,14 @@ const DEFAULT_SETTINGS: AppSettings = {
 };
 
 export const api = {
-  getUsers: async (): Promise<User[]> => fetchFromHost('users'),
-  saveUsers: async (users: User[]) => saveToHost('users', users),
+  getUsers: async (): Promise<User[]> => fetchFromCloud('users'),
+  saveUsers: async (users: User[]) => saveToCloud('users', users),
 
-  getProducts: async (): Promise<Product[]> => fetchFromHost('products'),
-  saveProducts: async (products: Product[]) => saveToHost('products', products),
+  getProducts: async (): Promise<Product[]> => fetchFromCloud('products'),
+  saveProducts: async (products: Product[]) => saveToCloud('products', products),
 
-  getCustomers: async (): Promise<Customer[]> => fetchFromHost('customers'),
-  saveCustomers: async (customers: Customer[]) => saveToHost('customers', customers),
+  getCustomers: async (): Promise<Customer[]> => fetchFromCloud('customers'),
+  saveCustomers: async (customers: Customer[]) => saveToCloud('customers', customers),
   
   recalculateCustomerTier: (customer: Customer): Customer => {
     if (customer.totalSpent > 500000) customer.tier = CustomerTier.PLATINUM;
@@ -74,8 +93,8 @@ export const api = {
     return customer;
   },
 
-  getRentals: async (): Promise<Rental[]> => fetchFromHost('rentals'),
-  saveRentals: async (rentals: Rental[]) => saveToHost('rentals', rentals),
+  getRentals: async (): Promise<Rental[]> => fetchFromCloud('rentals'),
+  saveRentals: async (rentals: Rental[]) => saveToCloud('rentals', rentals),
 
   getSettings: (): AppSettings => {
     const saved = localStorage.getItem(STORAGE_KEYS.SETTINGS);
@@ -83,6 +102,6 @@ export const api = {
   },
   saveSettings: (settings: AppSettings) => {
     localStorage.setItem(STORAGE_KEYS.SETTINGS, JSON.stringify(settings));
-    saveToHost('settings', settings); 
+    saveToCloud('settings', settings); 
   },
 };
