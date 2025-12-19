@@ -2,51 +2,43 @@ import { Customer, Product, Rental, User, CustomerTier, AppSettings } from "../t
 
 /**
  * API Service
- * Handles both local persistence and server-side sync (if available).
+ * Handles both local persistence and server-side sync.
+ * Optimized for both cPanel (PHP) and static hosting (Netlify).
  */
 
 const API_URL = 'api.php';
-
-// Internal helper for localStorage keys
 const getLocalKey = (type: string) => 'gmd_backup_' + type;
 
 const fetchFromHost = async (type: string) => {
     try {
-        const url = `${API_URL}?action=get&type=${type}`;
-        const response = await fetch(url);
+        const response = await fetch(`${API_URL}?action=get&type=${type}`);
         
-        if (!response.ok) {
-            throw new Error(`Server returned ${response.status}`);
+        if (response.ok) {
+            const data = await response.json();
+            localStorage.setItem(getLocalKey(type), JSON.stringify(data));
+            return data;
         }
-        
-        const data = await response.json();
-        localStorage.setItem(getLocalKey(type), JSON.stringify(data));
-        return data;
     } catch (e) {
-        // This is critical for Netlify: it falls back to LocalStorage if api.php isn't there
-        console.warn(`Sync unavailable for ${type}. Using local storage.`);
-        const saved = localStorage.getItem(getLocalKey(type));
-        return saved ? JSON.parse(saved) : [];
+        // Log error only in development if needed
     }
+    
+    // Fallback to local storage for static hosting/offline
+    const saved = localStorage.getItem(getLocalKey(type));
+    return saved ? JSON.parse(saved) : [];
 };
 
 const saveToHost = async (type: string, data: any) => {
-    // Always save locally first for speed and offline support
+    // Persistent local backup
     localStorage.setItem(getLocalKey(type), JSON.stringify(data));
     
     try {
-        const url = `${API_URL}?action=save&type=${type}`;
-        const response = await fetch(url, {
+        await fetch(`${API_URL}?action=save&type=${type}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(data)
         });
-        
-        if (!response.ok) {
-            console.debug('Host update skipped (No backend detected).');
-        }
     } catch (e) {
-        // Silently fail as the data is already in LocalStorage
+        // Silently fail if no backend is present
     }
 };
 

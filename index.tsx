@@ -5,12 +5,12 @@ import App from './App.tsx';
 const rootElement = document.getElementById('root');
 
 if (!rootElement) {
-  throw new Error("Critical: Could not find root element. The index.html may be malformed.");
+  console.error("Critical: Could not find root element.");
+} else {
+  const root = createRoot(rootElement);
+  root.render(
+    <React.StrictMode>
+      <App />
+    </React.StrictMode>
+  );
 }
-
-const root = createRoot(rootElement);
-root.render(
-  <React.StrictMode>
-    <App />
-  </React.StrictMode>
-);
